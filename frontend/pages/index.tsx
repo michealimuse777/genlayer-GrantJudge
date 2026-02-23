@@ -31,9 +31,10 @@ export default function Home() {
         // We override the RPC URL here to point directly to GenLayer StudioNet
         const studionetChain = {
             ...simulator,
+            id: 61999, // StudioNet Chain ID
             rpcUrls: {
-                default: { http: ['https://studio.genlayer.com:7181'] },
-                public: { http: ['https://studio.genlayer.com:7181'] }
+                default: { http: ['https://studio.genlayer.com/api'] },
+                public: { http: ['https://studio.genlayer.com/api'] }
             }
         };
 
