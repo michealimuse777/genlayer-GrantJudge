@@ -2,17 +2,13 @@ import { useState, useEffect } from 'react';
 import { createClient } from "genlayer-js";
 import { simulator } from "genlayer-js/chains";
 
-import AppShell from '../components/AppShell';
-import ProposalComposer from '../components/ProposalComposer';
-import { EvaluationTimeline } from '../components/EvaluationTimeline';
-import { RankedResults } from '../components/RankedResults';
-
 // The StudioNet contract address we deployed
 const CONTRACT_ADDRESS = "0xb87E7682FFDED20398DF913e3019dDD43f56bb46";
 
-// Initialize genlayer simulator client
+// Initialize genlayer simulator client using a throwaway dev key
 const client = createClient({
     chain: simulator,
+    account: "0x1234567890123456789012345678901234567890123456789012345678901234",
 });
 
 export default function Home() {
@@ -48,9 +44,11 @@ export default function Home() {
             // Optionally, trigger score immediately:
             // await client.writeContract({ address: CONTRACT_ADDRESS, functionName: "multi_score", args: [newProposalId] });
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Submission failed:", error);
-            setEvaluationSteps(prev => [...prev, { title: "Error", detail: "Transaction failed." }]);
+            // Show the actual error message in the UI so the user can see what failed
+            const errorMsg = error?.message || error?.toString() || "Transaction failed.";
+            setEvaluationSteps(prev => [...prev, { title: "Error", detail: errorMsg }]);
         } finally {
             setIsSubmitting(false);
         }
