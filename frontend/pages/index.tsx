@@ -73,10 +73,16 @@ export default function Home() {
 
             setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion Complete", detail: `Tx ${hash.slice(0, 10)}... recorded.` }]);
 
-            setEvaluationSteps(prev => [...prev, { title: "Scoring Required", detail: "Please trigger evaluator multi-score bounds." }]);
+            setEvaluationSteps(prev => [...prev, { title: "Scoring Triggered", detail: "Requesting Multi-LLM consensus bounds..." }]);
 
-            // Optionally, trigger score immediately:
-            // await client.writeContract({ address: CONTRACT_ADDRESS, functionName: "multi_score", args: [newProposalId] });
+            // Trigger score immediately to execute the Python LLM logic
+            const scoreHash = await client.writeContract({
+                address: CONTRACT_ADDRESS,
+                functionName: "multi_score",
+                args: [newProposalId]
+            });
+
+            setEvaluationSteps(prev => [...prev, { title: "Consensus Reached", detail: `Scores computed in Tx ${scoreHash.slice(0, 10)}...` }]);
 
         } catch (error: any) {
             console.error("Submission failed:", error);
