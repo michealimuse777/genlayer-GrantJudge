@@ -8,7 +8,7 @@ import { EvaluationTimeline } from '../components/EvaluationTimeline';
 import { RankedResults } from '../components/RankedResults';
 
 // The StudioNet contract address we deployed
-const CONTRACT_ADDRESS = "0xb87E7682FFDED20398DF913e3019dDD43f56bb46";
+const CONTRACT_ADDRESS = "0xeED8726b9F1e0E1EF5b2088a1459dc14C14cb518";
 
 export default function Home() {
     const [proposals, setProposals] = useState<any[]>([]);
@@ -100,6 +100,8 @@ export default function Home() {
             return;
         }
 
+        console.log("Fetching rankings from StudioNet...");
+
         try {
             // Read data from Smart Contract
             const result = await client.readContract({
@@ -108,9 +110,20 @@ export default function Home() {
                 args: []
             });
 
+            console.log("Raw GenLayer result:", result);
+
             // Handle returned python lists/dicts representing JSON from LLM
             if (Array.isArray(result)) {
                 setProposals(result);
+            } else {
+                console.warn("Expected array, got:", typeof result, result);
+                // Attempt to parse if it returned a raw stringified JSON wrapped in an object or primitive
+                try {
+                    const parsed = JSON.parse(result as any);
+                    if (Array.isArray(parsed)) setProposals(parsed);
+                } catch (e) {
+                    console.error("Could not parse result into Array");
+                }
             }
         } catch (error) {
             console.error("Failed to read rankings:", error);
