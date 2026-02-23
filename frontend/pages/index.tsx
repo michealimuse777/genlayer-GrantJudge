@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react';
 import { createClient } from "genlayer-js";
 import { simulator } from "genlayer-js/chains";
 
+import AppShell from '../components/AppShell';
+import ProposalComposer from '../components/ProposalComposer';
+import { EvaluationTimeline } from '../components/EvaluationTimeline';
+import { RankedResults } from '../components/RankedResults';
+
 // The StudioNet contract address we deployed
 const CONTRACT_ADDRESS = "0xb87E7682FFDED20398DF913e3019dDD43f56bb46";
-
-// Initialize genlayer simulator client using a throwaway dev key
-const client = createClient({
-    chain: simulator,
-    account: "0x1234567890123456789012345678901234567890123456789012345678901234",
-});
 
 export default function Home() {
     const [proposals, setProposals] = useState<any[]>([]);
@@ -17,11 +16,29 @@ export default function Home() {
     const [newProposalId, setNewProposalId] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Dynamically store the GenLayer client tied to the browser wallet
+    const [client, setClient] = useState<any>(null);
+
+    // Initialize the client on mount by connecting to the browser extension
+    useEffect(() => {
+        // We will default to the simulator chain
+        const browserClient = createClient({
+            chain: simulator
+        });
+        setClient(browserClient);
+    }, []);
+
     // Simulated steps for UI feedback as real transaction processes
     const [evaluationSteps, setEvaluationSteps] = useState<{ title: string; detail: string }[]>([]);
 
     const submitProposal = async () => {
         if (!newProposalId || isSubmitting) return;
+
+        if (!client) {
+            setEvaluationSteps([{ title: "Wallet Error", detail: "Please install the GenLayer browser extension and connect." }]);
+            return;
+        }
+
         setIsSubmitting(true);
 
         setEvaluationSteps([
@@ -55,6 +72,11 @@ export default function Home() {
     };
 
     const getRankings = async () => {
+        if (!client) {
+            console.error("No GenLayer client configured.");
+            return;
+        }
+
         try {
             // Read data from Smart Contract
             const result = await client.readContract({
