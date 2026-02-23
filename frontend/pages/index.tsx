@@ -1,57 +1,77 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from "genlayer-js";
+import { simulator } from "genlayer-js/chains";
+
 import AppShell from '../components/AppShell';
 import ProposalComposer from '../components/ProposalComposer';
 import { EvaluationTimeline } from '../components/EvaluationTimeline';
 import { RankedResults } from '../components/RankedResults';
 
+// The StudioNet contract address we deployed
+const CONTRACT_ADDRESS = "0xb87E7682FFDED20398DF913e3019dDD43f56bb46";
+
+// Initialize genlayer simulator client
+const client = createClient({
+    chain: simulator,
+});
+
 export default function Home() {
     const [proposals, setProposals] = useState<any[]>([]);
     const [newProposalText, setNewProposalText] = useState("");
     const [newProposalId, setNewProposalId] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Simulated steps for UI feedback
+    // Simulated steps for UI feedback as real transaction processes
     const [evaluationSteps, setEvaluationSteps] = useState<{ title: string; detail: string }[]>([]);
 
     const submitProposal = async () => {
-        if (!newProposalId) return;
+        if (!newProposalId || isSubmitting) return;
+        setIsSubmitting(true);
 
-        // Simulate Intelligent Contract reasoning steps over time
         setEvaluationSteps([
-            { title: "Proposal Received", detail: `ID ${newProposalId} ingested by IntContract.` },
-            { title: "Analyzing Content", detail: "Scraping raw proposal strings via GenVM NLP..." }
+            { title: "Proposal Transmitted", detail: `ID ${newProposalId} sent to StudioNet...` }
         ]);
 
-        setTimeout(() => {
-            setEvaluationSteps(prev => [...prev, { title: "Multi-Agent Consensus (3)", detail: "Reviewing Rubric: Clarity, Innovation, Feasibility" }]);
-        }, 1500);
+        try {
+            // Write transaction to Smart Contract
+            const hash = await client.writeContract({
+                address: CONTRACT_ADDRESS,
+                functionName: "submit_proposal",
+                args: [newProposalId, newProposalText, "0xUserDemo"],
+            });
+            console.log("Transaction Hash:", hash);
 
-        setTimeout(() => {
-            setEvaluationSteps(prev => [...prev, { title: "Consensus Reached", detail: "Transaction committed to Finality Window." }]);
-        }, 3000);
+            setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion Complete", detail: `Tx ${hash.slice(0, 10)}... recorded.` }]);
+
+            setEvaluationSteps(prev => [...prev, { title: "Scoring Required", detail: "Please trigger evaluator multi-score bounds." }]);
+
+            // Optionally, trigger score immediately:
+            // await client.writeContract({ address: CONTRACT_ADDRESS, functionName: "multi_score", args: [newProposalId] });
+
+        } catch (error) {
+            console.error("Submission failed:", error);
+            setEvaluationSteps(prev => [...prev, { title: "Error", detail: "Transaction failed." }]);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const getRankings = async () => {
-        // Simulated rankings matching the new design object
-        setProposals([
-            {
-                proposal_id: "DEMO-XYZ-01",
-                status: "MULTI_SCORED",
-                total_score: 24.5,
-                scores: { clarity: 8.5, innovation: 9.0, feasibility: 7.0 }
-            },
-            {
-                proposal_id: "PR-104",
-                status: "MULTI_SCORED",
-                total_score: 26.8,
-                scores: { clarity: 9.2, innovation: 8.5, feasibility: 9.1 }
-            },
-            {
-                proposal_id: "PR-211-DEFI",
-                status: "MULTI_SCORED",
-                total_score: 19.3,
-                scores: { clarity: 6.0, innovation: 7.5, feasibility: 5.8 }
+        try {
+            // Read data from Smart Contract
+            const result = await client.readContract({
+                address: CONTRACT_ADDRESS,
+                functionName: "rank_all",
+                args: []
+            });
+
+            // Handle returned python lists/dicts representing JSON from LLM
+            if (Array.isArray(result)) {
+                setProposals(result);
             }
-        ].sort((a, b) => b.total_score - a.total_score)); // Highest first
+        } catch (error) {
+            console.error("Failed to read rankings:", error);
+        }
     };
 
     return (
