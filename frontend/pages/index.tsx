@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createClient } from "genlayer-js";
+import { createClient, createAccount } from "genlayer-js";
 import { simulator } from "genlayer-js/chains";
 
 import AppShell from '../components/AppShell';
@@ -19,11 +19,27 @@ export default function Home() {
     // Dynamically store the GenLayer client tied to the browser wallet
     const [client, setClient] = useState<any>(null);
 
-    // Initialize the client on mount by connecting to the browser extension
+    // Initialize the client on mount
     useEffect(() => {
-        // We will default to the simulator chain
+        // We use the simulator chain with a hardcoded throwaway key
+        // strictly because the JS SDK does not yet support browser extensions
+
+        // The SDK requires the private key to be wrapped in an Account object
+        const account = createAccount("0x1234567890123456789012345678901234567890123456789012345678901234");
+
+        // The default "simulator" points to your localhost:4000
+        // We override the RPC URL here to point directly to GenLayer StudioNet
+        const studionetChain = {
+            ...simulator,
+            rpcUrls: {
+                default: { http: ['https://studio.genlayer.com:7181'] },
+                public: { http: ['https://studio.genlayer.com:7181'] }
+            }
+        };
+
         const browserClient = createClient({
-            chain: simulator
+            chain: studionetChain,
+            account: account
         });
         setClient(browserClient);
     }, []);
