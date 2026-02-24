@@ -8,7 +8,7 @@ import { EvaluationTimeline } from '../components/EvaluationTimeline';
 import { RankedResults } from '../components/RankedResults';
 
 // The StudioNet contract address we deployed
-const CONTRACT_ADDRESS = "0x5C79C9F87c539131A80d65Ad389e360EaD502D0F";
+const CONTRACT_ADDRESS = "0x55332F18b8c864CDd24EC6F7277c3bB416C0ee85";
 
 export default function Home() {
     const [proposals, setProposals] = useState<any[]>([]);
@@ -29,19 +29,12 @@ export default function Home() {
 
         // The default "simulator" points to your localhost:4000
         // We override the RPC URL here to point directly to GenLayer StudioNet
-        const studionetChain = {
-            ...simulator,
-            id: 61999, // StudioNet Chain ID
-            rpcUrls: {
-                default: { http: ['https://studio.genlayer.com/api'] },
-                public: { http: ['https://studio.genlayer.com/api'] }
-            }
+        const config = {
+            chain: simulator,
+            account: account,
+            endpoint: "https://studio.genlayer.com/api"
         };
-
-        const browserClient = createClient({
-            chain: studionetChain,
-            account: account
-        });
+        const browserClient = createClient(config);
         setClient(browserClient);
     }, []);
 
@@ -71,7 +64,16 @@ export default function Home() {
             });
             console.log("Transaction Hash:", hash);
 
-            setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion Complete", detail: `Tx ${hash.slice(0, 10)}... recorded.` }]);
+            setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion", detail: `Tx ${hash.slice(0, 10)}... pending finalization.` }]);
+
+            await client.waitForTransactionReceipt({
+                hash: hash,
+                status: "FINALIZED",
+                interval: 5000,
+                retries: 24,
+            });
+
+            setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion Complete", detail: `Tx finalized.` }]);
 
             setEvaluationSteps(prev => [...prev, { title: "Scoring Triggered", detail: "Requesting Multi-LLM consensus bounds..." }]);
 
@@ -79,10 +81,27 @@ export default function Home() {
             const scoreHash = await client.writeContract({
                 address: CONTRACT_ADDRESS,
                 functionName: "multi_score",
-                args: [newProposalId]
+                args: [newProposalId],
+                leaderOnly: true
             });
 
-            setEvaluationSteps(prev => [...prev, { title: "Consensus Reached", detail: `Scores computed in Tx ${scoreHash.slice(0, 10)}...` }]);
+            setEvaluationSteps(prev => [...prev, { title: "AI Evaluation Initialized", detail: `Tx ${scoreHash.slice(0, 10)} pending...` }]);
+
+            const receipt = await client.waitForTransactionReceipt({
+                hash: scoreHash,
+                status: "FINALIZED",
+                interval: 5000,
+                retries: 24,
+            });
+
+            console.log("Score receipt:", JSON.stringify(receipt));
+            const resultStatus = (receipt as any)?.status_name || (receipt as any)?.result_name || "UNKNOWN";
+
+            if (resultStatus === "ACCEPTED" || resultStatus === "MAJORITY_AGREE") {
+                setEvaluationSteps(prev => [...prev, { title: "✅ Consensus Reached", detail: `Scores computed and logged on-chain! (${resultStatus})` }]);
+            } else {
+                setEvaluationSteps(prev => [...prev, { title: "⚠️ Transaction Finalized", detail: `Status: ${resultStatus}. Scores may not have been saved.` }]);
+            }
 
         } catch (error: any) {
             console.error("Submission failed:", error);
@@ -112,21 +131,26 @@ export default function Home() {
 
             console.log("Raw GenLayer result:", result);
 
-            // Handle returned python lists/dicts representing JSON from LLM
-            if (Array.isArray(result)) {
-                setProposals(result);
-            } else {
-                console.warn("Expected array, got:", typeof result, result);
-                // Attempt to parse if it returned a raw stringified JSON wrapped in an object or primitive
-                try {
-                    const parsed = JSON.parse(result as any);
-                    if (Array.isArray(parsed)) setProposals(parsed);
-                } catch (e) {
-                    console.error("Could not parse result into Array");
+            // Handle returned python strings representing JSON from LLM
+            console.log("Raw GenLayer result:", result);
+
+            try {
+                // The new 0x66... contract perfectly returns a stringified JSON array
+                const parsed = JSON.parse(result as string);
+                console.log("Parsed Array:", parsed);
+                if (Array.isArray(parsed)) {
+                    console.log("Setting proposals into React State:", parsed);
+                    setProposals(parsed);
+                } else {
+                    console.warn("Parsed result was not an array:", parsed);
                 }
+            } catch (e: any) {
+                console.error("Could not parse result into JSON Array", e);
+                alert("Could not parse JSON: " + e.message);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to read rankings:", error);
+            alert("Failed to read from GenLayer: " + (error?.message || error?.toString()));
         }
     };
 

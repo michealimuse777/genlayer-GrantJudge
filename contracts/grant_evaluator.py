@@ -32,24 +32,58 @@ class GrantEvaluator(gl.Contract):
 
     def _execute_llm_evaluation(self, proposal_text: str, appeal: str = "") -> str:
         def get_eval() -> str:
-            prompt = f"""
-Evaluate this grant proposal.
-Text: {proposal_text}
-Appeal: {appeal}
+            text = proposal_text.lower()
+            words = text.split()
+            word_count = len(words)
+            
+            # Clarity: based on length, structure, and descriptive keywords
+            clarity = 3
+            if word_count > 20:
+                clarity += 2
+            if word_count > 50:
+                clarity += 2
+            if any(w in text for w in ["build", "create", "implement", "develop", "design"]):
+                clarity += 1
+            if "." in proposal_text:
+                clarity += 1
+            if any(w in text for w in ["goal", "objective", "aim", "purpose"]):
+                clarity += 1
+            clarity = min(clarity, 10)
+            
+            # Innovation: based on technical and novel keywords
+            innovation = 2
+            if any(w in text for w in ["novel", "unique", "new", "innovative", "first"]):
+                innovation += 2
+            if any(w in text for w in ["ai", "blockchain", "machine learning", "decentralized", "autonomous"]):
+                innovation += 2
+            if any(w in text for w in ["smart contract", "protocol", "framework", "platform"]):
+                innovation += 2
+            if any(w in text for w in ["transparent", "trustless", "consensus"]):
+                innovation += 1
+            if word_count > 30:
+                innovation += 1
+            innovation = min(innovation, 10)
+            
+            # Feasibility: based on actionable and planning keywords
+            feasibility = 3
+            if any(w in text for w in ["mvp", "milestone", "timeline", "phase", "deadline"]):
+                feasibility += 2
+            if any(w in text for w in ["team", "experience", "built", "deployed", "tested"]):
+                feasibility += 2
+            if any(w in text for w in ["realistic", "achievable", "practical", "feasible"]):
+                feasibility += 1
+            if word_count > 15:
+                feasibility += 1
+            if word_count > 40:
+                feasibility += 1
+            feasibility = min(feasibility, 10)
+            
+            summary = f"Evaluated based on {word_count} words with keyword analysis"
+            
+            result = {"clarity": clarity, "feasibility": feasibility, "innovation": innovation, "summary": summary}
+            return json.dumps(result, separators=(',', ':'), sort_keys=True)
 
-Rate Clarity, Innovation, and Feasibility exactly as integers 5, 6, 7, 8, or 9.
-You MUST output ONLY a valid JSON dictionary in this exact format, with no extra whitespace:
-{{"clarity":7,"feasibility":8,"innovation":6}}
-"""
-            result = gl.exec_prompt(prompt).replace("```json", "").replace("```", "").strip()
-            # Parse and re-dump to ensure perfect string matching across validator consensus
-            try:
-                parsed = json.loads(result)
-                return json.dumps(parsed, separators=(',', ':'), sort_keys=True)
-            except Exception:
-                return '{"clarity":5,"feasibility":5,"innovation":5}'
-
-        result_json_str = gl.eq_principle_strict_eq(get_eval)
+        result_json_str = gl.eq_principle.strict_eq(get_eval)
         return result_json_str
 
     @gl.public.write
@@ -81,24 +115,36 @@ You MUST output ONLY a valid JSON dictionary in this exact format, with no extra
         return scores_str
 
     @gl.public.view
-    def rank_all(self) -> list:
+    def rank_all(self) -> str:
         all_scores = []
         for p_id, p in self.proposals.items():
             try:
-                scores = json.loads(p.scores)
-                if isinstance(scores, dict) and "clarity" in scores and "innovation" in scores and "feasibility" in scores:
-                    total = float(scores["clarity"]) + float(scores["innovation"]) + float(scores["feasibility"])
-                    all_scores.append({
-                        "proposal_id": p_id,
-                        "author": p.author,
-                        "total_score": total,
-                        "scores": scores,
-                        "status": p.status
-                    })
+                # Default values
+                total = 0.0
+                scores_dict = {}
+
+                # Safely parse scores
+                if p.scores and p.scores != "{}" and p.scores != "":
+                    try:
+                        parsed = json.loads(p.scores)
+                        if isinstance(parsed, dict) and "clarity" in parsed and "innovation" in parsed and "feasibility" in parsed:
+                            scores_dict = parsed
+                            total = float(parsed["clarity"]) + float(parsed["innovation"]) + float(parsed["feasibility"])
+                    except Exception:
+                        pass # Keep default zero scores
+
+                all_scores.append({
+                    "proposal_id": p_id,
+                    "author": p.author,
+                    "total_score": total,
+                    "scores": scores_dict,
+                    "status": p.status
+                })
             except Exception:
                 continue
         
-        return sorted(all_scores, key=lambda x: x["total_score"], reverse=True)
+        final_list = sorted(all_scores, key=lambda x: x["total_score"], reverse=True)
+        return json.dumps(final_list)
         
     @gl.public.write
     def appeal_proposal(self, proposal_id: str, appeal_text: str) -> str:

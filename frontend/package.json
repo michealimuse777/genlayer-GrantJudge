@@ -12,7 +12,7 @@
         "@headlessui/react": "^2.2.9",
         "clsx": "^2.1.1",
         "framer-motion": "^12.34.3",
-        "genlayer-js": "^0.1.0",
+        "genlayer-js": "^0.8.0",
         "lucide-react": "^0.303.0",
         "next": "14.2.1",
         "react": "^18",

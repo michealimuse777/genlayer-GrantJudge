@@ -3,16 +3,20 @@ def get_evaluation_prompt(proposal_text: str) -> str:
     Generates the strict evaluation prompt containing the rubric.
     """
     return f"""
-    Evaluate this grant proposal with the following rubric:
-    1. Clarity (0-10): How understandable and well-structured is the proposal?
-    2. Innovation (0-10): How novel is the approach or technology used?
-    3. Feasibility (0-10): How likely is the team to achieve their stated goals within the timeframe?
+    You are an evaluation validator.
+    Return STRICT JSON only:
+    
+    {{
+      "clarity": integer 0-10,
+      "innovation": integer 0-10,
+      "feasibility": integer 0-10,
+      "summary": "one sentence explanation"
+    }}
+
+    No additional commentary.
 
     Proposal:
     {proposal_text}
-
-    You must return ONLY a raw JSON object with the numerical scores.
-    Example: '{{"clarity": 8, "innovation": 7, "feasibility": 9}}'
     """
 
 def get_appeal_prompt(proposal_text: str, appeal_text: str) -> str:
