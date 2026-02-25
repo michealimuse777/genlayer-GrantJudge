@@ -114,6 +114,44 @@ class GrantEvaluator(gl.Contract):
         self.proposals[proposal_id] = p
         return scores_str
 
+    @gl.public.write
+    def ai_score(self, proposal_id: str, api_url: str) -> str:
+        if proposal_id not in self.proposals:
+            raise Exception("unknown proposal")
+        
+        p = self.proposals[proposal_id]
+        
+        def get_ai_eval() -> str:
+            # URL-encode the proposal text (first 500 chars to avoid URL length limits)
+            import urllib.parse
+            encoded_text = urllib.parse.quote(p.text[:500])
+            url = f"{api_url}?text={encoded_text}"
+            
+            # Call the external AI API via gl.get_webpage
+            response = gl.get_webpage(url, mode="text")
+            
+            # Parse and normalize the JSON response
+            try:
+                parsed = json.loads(response)
+                # Validate expected fields exist
+                if "clarity" in parsed and "innovation" in parsed and "feasibility" in parsed:
+                    return json.dumps(parsed, separators=(',', ':'), sort_keys=True)
+            except Exception:
+                pass
+            return '{"clarity":5,"feasibility":5,"innovation":5,"summary":"AI parsing fallback"}'
+        
+        try:
+            scores_str = gl.eq_principle.strict_eq(get_ai_eval)
+        except Exception:
+            # Fallback to deterministic scoring if AI call fails
+            scores_str = self._execute_llm_evaluation(p.text)
+        
+        p.scores = scores_str
+        p.status = "AI_SCORED"
+        
+        self.proposals[proposal_id] = p
+        return scores_str
+
     @gl.public.view
     def rank_all(self) -> str:
         all_scores = []

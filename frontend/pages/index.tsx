@@ -8,7 +8,7 @@ import { EvaluationTimeline } from '../components/EvaluationTimeline';
 import { RankedResults } from '../components/RankedResults';
 
 // The StudioNet contract address we deployed
-const CONTRACT_ADDRESS = "0x55332F18b8c864CDd24EC6F7277c3bB416C0ee85";
+const CONTRACT_ADDRESS = "0xcbe3ae936308B735cD2C1DcD5f6a09506903642b";
 
 export default function Home() {
     const [proposals, setProposals] = useState<any[]>([]);
@@ -75,13 +75,14 @@ export default function Home() {
 
             setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion Complete", detail: `Tx finalized.` }]);
 
-            setEvaluationSteps(prev => [...prev, { title: "Scoring Triggered", detail: "Requesting Multi-LLM consensus bounds..." }]);
+            setEvaluationSteps(prev => [...prev, { title: "Scoring Triggered", detail: "Calling AI evaluation oracle..." }]);
 
-            // Trigger score immediately to execute the Python LLM logic
+            // Use ai_score with the Vercel API endpoint as the oracle
+            const apiUrl = `${window.location.origin}/api/evaluate`;
             const scoreHash = await client.writeContract({
                 address: CONTRACT_ADDRESS,
-                functionName: "multi_score",
-                args: [newProposalId],
+                functionName: "ai_score",
+                args: [newProposalId, apiUrl],
                 leaderOnly: true
             });
 
