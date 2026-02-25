@@ -39,7 +39,7 @@ export default function Home() {
     }, []);
 
     // Simulated steps for UI feedback as real transaction processes
-    const [evaluationSteps, setEvaluationSteps] = useState<{ title: string; detail: string; txHash?: string }[]>([]);
+    const [evaluationSteps, setEvaluationSteps] = useState<{ title: string; detail: string }[]>([]);
 
     const submitProposal = async () => {
         if (!newProposalId || isSubmitting) return;
@@ -64,7 +64,7 @@ export default function Home() {
             });
             console.log("Transaction Hash:", hash);
 
-            setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion", detail: `Tx pending finalization.`, txHash: hash }]);
+            setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion", detail: `Tx ${hash.slice(0, 10)}... pending finalization.` }]);
 
             await client.waitForTransactionReceipt({
                 hash: hash,
@@ -73,7 +73,7 @@ export default function Home() {
                 retries: 24,
             });
 
-            setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion Complete", detail: `Tx finalized.`, txHash: hash }]);
+            setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion Complete", detail: `Tx finalized.` }]);
 
             setEvaluationSteps(prev => [...prev, { title: "Scoring Triggered", detail: "Requesting Multi-LLM consensus bounds..." }]);
 
@@ -85,7 +85,7 @@ export default function Home() {
                 leaderOnly: true
             });
 
-            setEvaluationSteps(prev => [...prev, { title: "AI Evaluation Initialized", detail: `Scoring tx pending...`, txHash: scoreHash }]);
+            setEvaluationSteps(prev => [...prev, { title: "AI Evaluation Initialized", detail: `Tx ${scoreHash.slice(0, 10)}... pending...` }]);
 
             const receipt = await client.waitForTransactionReceipt({
                 hash: scoreHash,
@@ -98,7 +98,7 @@ export default function Home() {
             const resultStatus = (receipt as any)?.status_name || (receipt as any)?.result_name || "UNKNOWN";
 
             if (resultStatus === "ACCEPTED" || resultStatus === "MAJORITY_AGREE") {
-                setEvaluationSteps(prev => [...prev, { title: "✅ Consensus Reached", detail: `Scores computed and logged on-chain! (${resultStatus})`, txHash: scoreHash }]);
+                setEvaluationSteps(prev => [...prev, { title: "✅ Consensus Reached", detail: `Scores computed and logged on-chain! (${resultStatus})` }]);
             } else {
                 setEvaluationSteps(prev => [...prev, { title: "⚠️ Transaction Finalized", detail: `Status: ${resultStatus}. Scores may not have been saved.` }]);
             }
