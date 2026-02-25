@@ -8,7 +8,7 @@ import { EvaluationTimeline } from '../components/EvaluationTimeline';
 import { RankedResults } from '../components/RankedResults';
 
 // The StudioNet contract address we deployed
-const CONTRACT_ADDRESS = "0xcbe3ae936308B735cD2C1DcD5f6a09506903642b";
+const CONTRACT_ADDRESS = "0x7dc45632d14bbE131F10F3BbD706F503aDCc01c4";
 
 export default function Home() {
     const [proposals, setProposals] = useState<any[]>([]);

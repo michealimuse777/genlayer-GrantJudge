@@ -120,20 +120,16 @@ class GrantEvaluator(gl.Contract):
             raise Exception("unknown proposal")
         
         p = self.proposals[proposal_id]
+        scores_str = ""
         
+        # Try AI oracle via gl.get_webpage
         def get_ai_eval() -> str:
-            # URL-encode the proposal text (first 500 chars to avoid URL length limits)
             import urllib.parse
             encoded_text = urllib.parse.quote(p.text[:500])
             url = f"{api_url}?text={encoded_text}"
-            
-            # Call the external AI API via gl.get_webpage
             response = gl.get_webpage(url, mode="text")
-            
-            # Parse and normalize the JSON response
             try:
                 parsed = json.loads(response)
-                # Validate expected fields exist
                 if "clarity" in parsed and "innovation" in parsed and "feasibility" in parsed:
                     return json.dumps(parsed, separators=(',', ':'), sort_keys=True)
             except Exception:
@@ -143,8 +139,17 @@ class GrantEvaluator(gl.Contract):
         try:
             scores_str = gl.eq_principle.strict_eq(get_ai_eval)
         except Exception:
-            # Fallback to deterministic scoring if AI call fails
-            scores_str = self._execute_llm_evaluation(p.text)
+            pass
+        
+        # Fallback: deterministic text analysis (no eq_principle needed)
+        if not scores_str or scores_str == "":
+            text = p.text.lower()
+            words = text.split()
+            wc = len(words)
+            c = min(10, 3 + (2 if wc > 20 else 0) + (2 if wc > 50 else 0) + (1 if any(w in text for w in ["build","create","implement"]) else 0) + (1 if "." in p.text else 0))
+            i = min(10, 2 + (2 if any(w in text for w in ["novel","unique","new","innovative"]) else 0) + (2 if any(w in text for w in ["ai","blockchain","decentralized"]) else 0) + (2 if any(w in text for w in ["smart contract","protocol","framework"]) else 0) + (1 if wc > 30 else 0))
+            f = min(10, 3 + (2 if any(w in text for w in ["mvp","milestone","timeline"]) else 0) + (2 if any(w in text for w in ["team","experience","deployed"]) else 0) + (1 if wc > 15 else 0) + (1 if wc > 40 else 0))
+            scores_str = json.dumps({"clarity":c,"feasibility":f,"innovation":i,"summary":f"Deterministic fallback ({wc} words)"}, separators=(',',':'), sort_keys=True)
         
         p.scores = scores_str
         p.status = "AI_SCORED"
