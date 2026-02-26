@@ -75,18 +75,17 @@ export default function Home() {
 
             setEvaluationSteps(prev => [...prev, { title: "Blockchain Ingestion Complete", detail: `Tx finalized.` }]);
 
-            setEvaluationSteps(prev => [...prev, { title: "Scoring Triggered", detail: "Calling AI evaluation oracle..." }]);
+            setEvaluationSteps(prev => [...prev, { title: "Scoring Triggered", detail: "Running deterministic evaluation via consensus..." }]);
 
-            // Use ai_score with the Vercel API endpoint as the oracle
-            const apiUrl = `${window.location.origin}/api/evaluate`;
+            // Use multi_score for deterministic keyword-based scoring with strict_eq consensus
             const scoreHash = await client.writeContract({
                 address: CONTRACT_ADDRESS,
-                functionName: "ai_score",
-                args: [newProposalId, apiUrl],
+                functionName: "multi_score",
+                args: [newProposalId],
                 leaderOnly: true
             });
 
-            setEvaluationSteps(prev => [...prev, { title: "AI Evaluation Initialized", detail: `Tx ${scoreHash.slice(0, 10)}... pending...` }]);
+            setEvaluationSteps(prev => [...prev, { title: "Evaluation Initialized", detail: `Tx ${scoreHash.slice(0, 10)}... pending...` }]);
 
             const receipt = await client.waitForTransactionReceipt({
                 hash: scoreHash,
